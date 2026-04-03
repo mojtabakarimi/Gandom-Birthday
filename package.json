@@ -1,0 +1,11 @@
+{
+  "name": "gandom-birthday",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev:api": "npm run dev -w packages/api",
+    "dev:web": "npm run dev -w packages/web",
+    "test:api": "npm test -w packages/api",
+    "build:web": "npm run build -w packages/web"
+  }
+}

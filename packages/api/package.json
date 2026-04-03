@@ -1,0 +1,21 @@
+{
+  "name": "gandom-api",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 execute gandom-db --file=src/db/schema.sql"
+  },
+  "dependencies": {
+    "hono": "^4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4",
+    "@cloudflare/vitest-pool-workers": "^0.5",
+    "vitest": "^2",
+    "wrangler": "^3",
+    "typescript": "^5"
+  }
+}

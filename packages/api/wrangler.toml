@@ -1,0 +1,15 @@
+name = "gandom-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gandom-db"
+database_id = "placeholder-replace-after-create"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "gandom-files"
+
+[vars]
+CORS_ORIGIN = "https://gandom-birthday.pages.dev"
