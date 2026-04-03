@@ -24,35 +24,37 @@ export function Gallery() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
       <header className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-purple-700">
-            {t("gallery_title")}
-          </h1>
-          <div className="flex items-center gap-3">
-            <LanguagePicker variant="light" />
-            <button
-              onClick={() => navigate("/upload")}
-              className="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
-            >
-              {t("send_wish")}
-            </button>
-            {user?.role === "admin" && (
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h1 className="text-xl font-bold text-purple-700 shrink-0">
+              {t("gallery_title")}
+            </h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <LanguagePicker variant="light" />
               <button
-                onClick={() => navigate("/admin")}
-                className="px-4 py-1.5 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700"
+                onClick={() => navigate("/upload")}
+                className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs sm:text-sm hover:bg-purple-700 whitespace-nowrap"
               >
-                Admin
+                {t("send_wish")}
               </button>
-            )}
-            <button
-              onClick={async () => {
-                await logout();
-                navigate("/");
-              }}
-              className="text-gray-500 hover:text-gray-700 text-sm"
-            >
-              {t("logout")}
-            </button>
+              {user?.role === "admin" && (
+                <button
+                  onClick={() => navigate("/admin")}
+                  className="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-xs sm:text-sm hover:bg-gray-700 whitespace-nowrap"
+                >
+                  Admin
+                </button>
+              )}
+              <button
+                onClick={async () => {
+                  await logout();
+                  navigate("/");
+                }}
+                className="text-gray-500 hover:text-gray-700 text-xs sm:text-sm whitespace-nowrap"
+              >
+                {t("logout")}
+              </button>
+            </div>
           </div>
         </div>
       </header>

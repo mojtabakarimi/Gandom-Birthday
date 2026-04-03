@@ -24,24 +24,26 @@ export function Upload() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
       <header className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-30">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-purple-700">
-            {t("upload_title")}
-          </h1>
-          <div className="flex items-center gap-3">
-            <LanguagePicker variant="light" />
-            <button
-              onClick={() => navigate("/gallery")}
-              className="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-sm"
-            >
-              {t("see_wishes")}
-            </button>
-            <button
-              onClick={async () => { await logout(); navigate("/"); }}
-              className="text-gray-500 hover:text-gray-700 text-sm"
-            >
-              {t("logout")}
-            </button>
+        <div className="max-w-2xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h1 className="text-xl font-bold text-purple-700 shrink-0">
+              {t("upload_title")}
+            </h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <LanguagePicker variant="light" />
+              <button
+                onClick={() => navigate("/gallery")}
+                className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs sm:text-sm whitespace-nowrap"
+              >
+                {t("see_wishes")}
+              </button>
+              <button
+                onClick={async () => { await logout(); navigate("/"); }}
+                className="text-gray-500 hover:text-gray-700 text-xs sm:text-sm whitespace-nowrap"
+              >
+                {t("logout")}
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -98,7 +100,7 @@ export function Upload() {
                     </p>
                   </div>
                   <span
-                    className={`text-xs px-2 py-1 rounded-full ${
+                    className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
                       u.status === "approved"
                         ? "bg-green-100 text-green-700"
                         : u.status === "rejected"
