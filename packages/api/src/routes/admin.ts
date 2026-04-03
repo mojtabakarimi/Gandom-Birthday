@@ -1,91 +1,82 @@
 import { Hono } from "hono";
-import type { Env, User, Upload } from "../types";
+import type { Env, User } from "../types";
 import { requireAuth, requireAdmin } from "../middleware/auth";
-import { deleteFromR2 } from "../lib/storage";
+import { deleteFiles } from "../lib/storage";
 
 const admin = new Hono<{
-  Bindings: Env;
-  Variables: { user: User; sessionId: string };
+  Variables: Env & { user: User; sessionId: string };
 }>();
 
 admin.use("/*", requireAuth, requireAdmin);
 
-// Dashboard stats
 admin.get("/stats", async (c) => {
+  const db = c.get("db");
   const [users, pending, approved] = await Promise.all([
-    c.env.DB.prepare("SELECT COUNT(*) as count FROM users").first<{
-      count: number;
-    }>(),
-    c.env.DB.prepare(
-      "SELECT COUNT(*) as count FROM uploads WHERE status = 'pending'"
-    ).first<{ count: number }>(),
-    c.env.DB.prepare(
-      "SELECT COUNT(*) as count FROM uploads WHERE status = 'approved'"
-    ).first<{ count: number }>(),
+    db.query("SELECT COUNT(*) as count FROM users"),
+    db.query("SELECT COUNT(*) as count FROM uploads WHERE status = 'pending'"),
+    db.query("SELECT COUNT(*) as count FROM uploads WHERE status = 'approved'"),
   ]);
 
   return c.json({
-    total_users: users?.count || 0,
-    pending_uploads: pending?.count || 0,
-    approved_uploads: approved?.count || 0,
+    total_users: parseInt(users.rows[0].count, 10),
+    pending_uploads: parseInt(pending.rows[0].count, 10),
+    approved_uploads: parseInt(approved.rows[0].count, 10),
   });
 });
 
-// List all users with upload counts
 admin.get("/users", async (c) => {
-  const { results } = await c.env.DB.prepare(
+  const db = c.get("db");
+  const result = await db.query(
     `SELECT u.id, u.username, u.display_name, u.email, u.role,
             u.invite_token, u.invite_accepted, u.created_at,
-            COUNT(up.id) as upload_count
+            COUNT(up.id)::int as upload_count
      FROM users u
      LEFT JOIN uploads up ON u.id = up.user_id
      GROUP BY u.id
      ORDER BY u.created_at DESC`
-  ).all();
+  );
 
-  return c.json({ users: results });
+  return c.json({ users: result.rows });
 });
 
-// Delete a user
 admin.delete("/users/:id", async (c) => {
+  const db = c.get("db");
+  const uploadDir = c.get("uploadDir");
   const userId = c.req.param("id");
   const deleteUploads = c.req.query("delete_uploads") === "true";
 
-  const user = await c.env.DB.prepare("SELECT * FROM users WHERE id = ?")
-    .bind(userId)
-    .first<User>();
+  const userResult = await db.query("SELECT * FROM users WHERE id = $1", [userId]);
 
-  if (!user) {
+  if (userResult.rows.length === 0) {
     return c.json({ error: "User not found" }, 404);
   }
 
-  if (user.role === "admin") {
+  if (userResult.rows[0].role === "admin") {
     return c.json({ error: "Cannot delete admin" }, 400);
   }
 
   if (deleteUploads) {
-    const { results } = await c.env.DB.prepare(
-      "SELECT file_key, thumbnail_key FROM uploads WHERE user_id = ?"
-    )
-      .bind(userId)
-      .all<{ file_key: string; thumbnail_key: string | null }>();
+    const uploadsResult = await db.query(
+      "SELECT file_key, thumbnail_key FROM uploads WHERE user_id = $1",
+      [userId]
+    );
 
-    const keys = results
-      .flatMap((r) => [r.file_key, r.thumbnail_key])
+    const keys = uploadsResult.rows
+      .flatMap((r: any) => [r.file_key, r.thumbnail_key])
       .filter(Boolean) as string[];
 
     if (keys.length > 0) {
-      await deleteFromR2(c.env.BUCKET, keys);
+      await deleteFiles(uploadDir, keys);
     }
   }
 
-  await c.env.DB.prepare("DELETE FROM users WHERE id = ?").bind(userId).run();
+  await db.query("DELETE FROM users WHERE id = $1", [userId]);
 
   return c.json({ ok: true });
 });
 
-// List uploads (with optional status filter)
 admin.get("/uploads", async (c) => {
+  const db = c.get("db");
   const status = c.req.query("status");
   const userId = c.req.query("user_id");
 
@@ -95,15 +86,16 @@ admin.get("/uploads", async (c) => {
     JOIN users usr ON up.user_id = usr.id
   `;
   const conditions: string[] = [];
-  const binds: string[] = [];
+  const params: string[] = [];
+  let paramIdx = 1;
 
   if (status) {
-    conditions.push("up.status = ?");
-    binds.push(status);
+    conditions.push(`up.status = $${paramIdx++}`);
+    params.push(status);
   }
   if (userId) {
-    conditions.push("up.user_id = ?");
-    binds.push(userId);
+    conditions.push(`up.user_id = $${paramIdx++}`);
+    params.push(userId);
   }
 
   if (conditions.length > 0) {
@@ -111,17 +103,13 @@ admin.get("/uploads", async (c) => {
   }
   query += " ORDER BY up.uploaded_at DESC";
 
-  const stmt = c.env.DB.prepare(query);
-  const { results } = await (binds.length > 0
-    ? stmt.bind(...binds)
-    : stmt
-  ).all();
+  const result = await db.query(query, params);
 
-  return c.json({ uploads: results });
+  return c.json({ uploads: result.rows });
 });
 
-// Update upload status (approve/reject/revoke)
 admin.patch("/uploads/:id", async (c) => {
+  const db = c.get("db");
   const uploadId = c.req.param("id");
   const adminUser = c.get("user");
   const { status } = await c.req.json<{
@@ -132,47 +120,42 @@ admin.patch("/uploads/:id", async (c) => {
     return c.json({ error: "Invalid status" }, 400);
   }
 
-  await c.env.DB.prepare(
-    "UPDATE uploads SET status = ?, reviewed_at = datetime('now'), reviewed_by = ? WHERE id = ?"
-  )
-    .bind(status, adminUser.id, uploadId)
-    .run();
+  await db.query(
+    "UPDATE uploads SET status = $1, reviewed_at = NOW(), reviewed_by = $2 WHERE id = $3",
+    [status, adminUser.id, uploadId]
+  );
 
-  const upload = await c.env.DB.prepare("SELECT * FROM uploads WHERE id = ?")
-    .bind(uploadId)
-    .first();
+  const result = await db.query("SELECT * FROM uploads WHERE id = $1", [uploadId]);
 
-  return c.json({ upload });
+  return c.json({ upload: result.rows[0] });
 });
 
-// Delete an upload permanently
 admin.delete("/uploads/:id", async (c) => {
+  const db = c.get("db");
+  const uploadDir = c.get("uploadDir");
   const uploadId = c.req.param("id");
 
-  const upload = await c.env.DB.prepare(
-    "SELECT file_key, thumbnail_key FROM uploads WHERE id = ?"
-  )
-    .bind(uploadId)
-    .first<{ file_key: string; thumbnail_key: string | null }>();
+  const result = await db.query(
+    "SELECT file_key, thumbnail_key FROM uploads WHERE id = $1",
+    [uploadId]
+  );
 
-  if (!upload) {
+  if (result.rows.length === 0) {
     return c.json({ error: "Upload not found" }, 404);
   }
 
-  const keys = [upload.file_key, upload.thumbnail_key].filter(
-    Boolean
-  ) as string[];
-  await deleteFromR2(c.env.BUCKET, keys);
+  const upload = result.rows[0];
+  const keys = [upload.file_key, upload.thumbnail_key].filter(Boolean) as string[];
+  await deleteFiles(uploadDir, keys);
 
-  await c.env.DB.prepare("DELETE FROM uploads WHERE id = ?")
-    .bind(uploadId)
-    .run();
+  await db.query("DELETE FROM uploads WHERE id = $1", [uploadId]);
 
   return c.json({ ok: true });
 });
 
-// Bulk actions on uploads
 admin.post("/uploads/bulk", async (c) => {
+  const db = c.get("db");
+  const uploadDir = c.get("uploadDir");
   const adminUser = c.get("user");
   const { ids, action } = await c.req.json<{
     ids: string[];
@@ -183,76 +166,69 @@ admin.post("/uploads/bulk", async (c) => {
     return c.json({ error: "No ids provided" }, 400);
   }
 
-  if (action === "delete") {
-    const placeholders = ids.map(() => "?").join(",");
-    const { results } = await c.env.DB.prepare(
-      `SELECT file_key, thumbnail_key FROM uploads WHERE id IN (${placeholders})`
-    )
-      .bind(...ids)
-      .all<{ file_key: string; thumbnail_key: string | null }>();
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(",");
 
-    const keys = results
-      .flatMap((r) => [r.file_key, r.thumbnail_key])
+  if (action === "delete") {
+    const result = await db.query(
+      `SELECT file_key, thumbnail_key FROM uploads WHERE id IN (${placeholders})`,
+      ids
+    );
+
+    const keys = result.rows
+      .flatMap((r: any) => [r.file_key, r.thumbnail_key])
       .filter(Boolean) as string[];
 
     if (keys.length > 0) {
-      await deleteFromR2(c.env.BUCKET, keys);
+      await deleteFiles(uploadDir, keys);
     }
 
-    await c.env.DB.prepare(
-      `DELETE FROM uploads WHERE id IN (${placeholders})`
-    )
-      .bind(...ids)
-      .run();
+    await db.query(
+      `DELETE FROM uploads WHERE id IN (${placeholders})`,
+      ids
+    );
 
     return c.json({ ok: true, updated: ids.length });
   }
 
   const statusValue = action === "approve" ? "approved" : "rejected";
-  const placeholders = ids.map(() => "?").join(",");
+  const statusPlaceholder = `$${ids.length + 1}`;
+  const reviewerPlaceholder = `$${ids.length + 2}`;
 
-  await c.env.DB.prepare(
-    `UPDATE uploads SET status = ?, reviewed_at = datetime('now'), reviewed_by = ?
-     WHERE id IN (${placeholders})`
-  )
-    .bind(statusValue, adminUser.id, ...ids)
-    .run();
+  await db.query(
+    `UPDATE uploads SET status = ${statusPlaceholder}, reviewed_at = NOW(), reviewed_by = ${reviewerPlaceholder}
+     WHERE id IN (${placeholders})`,
+    [...ids, statusValue, adminUser.id]
+  );
 
   return c.json({ ok: true, updated: ids.length });
 });
 
-// Get site settings
 admin.get("/settings", async (c) => {
-  const { results } = await c.env.DB.prepare(
-    "SELECT key, value FROM site_settings"
-  ).all();
+  const db = c.get("db");
+  const result = await db.query("SELECT key, value FROM site_settings");
 
   const settings: Record<string, string> = {};
-  for (const row of results as Array<{ key: string; value: string }>) {
+  for (const row of result.rows) {
     settings[row.key] = row.value;
   }
 
   return c.json({ settings });
 });
 
-// Update site settings
 admin.patch("/settings", async (c) => {
+  const db = c.get("db");
   const updates = await c.req.json<Record<string, string>>();
 
-  const batch = Object.entries(updates).map(([key, value]) =>
-    c.env.DB.prepare(
-      "INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)"
-    ).bind(key, value)
-  );
+  for (const [key, value] of Object.entries(updates)) {
+    await db.query(
+      "INSERT INTO site_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
+      [key, value]
+    );
+  }
 
-  await c.env.DB.batch(batch);
-
-  const { results } = await c.env.DB.prepare(
-    "SELECT key, value FROM site_settings"
-  ).all();
-
+  const result = await db.query("SELECT key, value FROM site_settings");
   const settings: Record<string, string> = {};
-  for (const row of results as Array<{ key: string; value: string }>) {
+  for (const row of result.rows) {
     settings[row.key] = row.value;
   }
 

@@ -1,21 +1,34 @@
 {
   "name": "gandom-api",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "deploy": "wrangler deploy",
-    "db:migrate": "wrangler d1 execute gandom-db --file=src/db/schema.sql"
+    "db:migrate": "node --import tsx src/db/migrate.ts"
   },
   "dependencies": {
-    "hono": "^4"
+    "hono": "^4",
+    "@hono/node-server": "^1",
+    "pg": "^8",
+    "bcryptjs": "^2",
+    "dotenv": "^16",
+    "uuid": "^11",
+    "multer": "^1",
+    "mime-types": "^2"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4",
-    "@cloudflare/vitest-pool-workers": "^0.5",
+    "@types/pg": "^8",
+    "@types/bcryptjs": "^2",
+    "@types/uuid": "^10",
+    "@types/multer": "^1",
+    "@types/mime-types": "^2",
+    "@types/node": "^22",
     "vitest": "^2",
-    "wrangler": "^3",
+    "tsx": "^4",
     "typescript": "^5"
   }
 }

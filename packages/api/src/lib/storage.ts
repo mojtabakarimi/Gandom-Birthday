@@ -1,3 +1,7 @@
+import { writeFile, unlink, mkdir } from "fs/promises";
+import { existsSync } from "fs";
+import { dirname, join } from "path";
+
 const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
@@ -5,8 +9,8 @@ const ALLOWED_IMAGE_TYPES = [
   "image/heic",
 ];
 const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/quicktime"];
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
 
 export type MediaType = "image" | "video";
 
@@ -35,22 +39,30 @@ export function validateFile(
   return { valid: true, mediaType: isImage ? "image" : "video" };
 }
 
-export async function uploadToR2(
-  bucket: R2Bucket,
+export async function saveFile(
+  uploadDir: string,
   key: string,
-  body: ReadableStream | ArrayBuffer,
-  contentType: string
+  data: Buffer
 ): Promise<void> {
-  await bucket.put(key, body, {
-    httpMetadata: { contentType },
-  });
+  const fullPath = join(uploadDir, key);
+  const dir = dirname(fullPath);
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+  await writeFile(fullPath, data);
 }
 
-export async function deleteFromR2(
-  bucket: R2Bucket,
+export async function deleteFiles(
+  uploadDir: string,
   keys: string[]
 ): Promise<void> {
-  await bucket.delete(keys);
+  for (const key of keys) {
+    try {
+      await unlink(join(uploadDir, key));
+    } catch {
+      // File may not exist
+    }
+  }
 }
 
 export function getFileExtension(contentType: string): string {

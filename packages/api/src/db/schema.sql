@@ -1,45 +1,45 @@
 CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  username TEXT UNIQUE,
-  display_name TEXT NOT NULL,
-  email TEXT,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username VARCHAR(255) UNIQUE,
+  display_name VARCHAR(255) NOT NULL,
+  email VARCHAR(255),
   password_hash TEXT,
-  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
-  invite_token TEXT UNIQUE,
-  invite_accepted INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  role VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  invite_token VARCHAR(255) UNIQUE,
+  invite_accepted BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS uploads (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   file_key TEXT NOT NULL,
   thumbnail_key TEXT,
-  media_type TEXT NOT NULL CHECK (media_type IN ('image', 'video')),
+  media_type VARCHAR(20) NOT NULL CHECK (media_type IN ('image', 'video')),
   caption TEXT,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  uploaded_at TEXT NOT NULL DEFAULT (datetime('now')),
-  reviewed_at TEXT,
-  reviewed_by TEXT REFERENCES users(id) ON DELETE SET NULL
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS site_settings (
-  key TEXT PRIMARY KEY,
+  key VARCHAR(255) PRIMARY KEY,
   value TEXT NOT NULL
 );
 
--- Default settings
-INSERT OR IGNORE INTO site_settings (key, value) VALUES
+INSERT INTO site_settings (key, value) VALUES
   ('birthday_message_en', 'Happy Birthday, dear Gandom!'),
   ('birthday_message_fa', '!تولدت مبارک گندم عزیز'),
   ('birthday_message_nb', 'Gratulerer med dagen, kjære Gandom!'),
   ('mode', 'animation'),
   ('max_file_size_mb', '50'),
-  ('max_uploads_per_user', '20');
+  ('max_uploads_per_user', '20')
+ON CONFLICT (key) DO NOTHING;

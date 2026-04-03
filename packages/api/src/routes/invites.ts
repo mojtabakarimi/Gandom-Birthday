@@ -1,19 +1,14 @@
 import { Hono } from "hono";
 import type { Env, User } from "../types";
-import {
-  hashPassword,
-  generateToken,
-  generateUUID,
-} from "../lib/crypto";
+import { hashPassword, generateToken, generateUUID } from "../lib/crypto";
 import { requireAuth, requireAdmin } from "../middleware/auth";
 
 const invites = new Hono<{
-  Bindings: Env;
-  Variables: { user: User; sessionId: string };
+  Variables: Env & { user: User; sessionId: string };
 }>();
 
-// Admin creates an invite
 invites.post("/", requireAuth, requireAdmin, async (c) => {
+  const db = c.get("db");
   const { display_name, email } = await c.req.json<{
     display_name: string;
     email?: string;
@@ -26,36 +21,35 @@ invites.post("/", requireAuth, requireAdmin, async (c) => {
   const id = generateUUID();
   const invite_token = generateToken();
 
-  await c.env.DB.prepare(
-    "INSERT INTO users (id, display_name, email, invite_token) VALUES (?, ?, ?, ?)"
-  )
-    .bind(id, display_name, email || null, invite_token)
-    .run();
+  await db.query(
+    "INSERT INTO users (id, display_name, email, invite_token) VALUES ($1, $2, $3, $4)",
+    [id, display_name, email || null, invite_token]
+  );
 
   return c.json({ id, display_name, invite_token }, 201);
 });
 
-// Get invite info (public — used by invite accept page)
 invites.get("/:token", async (c) => {
+  const db = c.get("db");
   const token = c.req.param("token");
-  const user = await c.env.DB.prepare(
-    "SELECT id, display_name, invite_accepted FROM users WHERE invite_token = ?"
-  )
-    .bind(token)
-    .first();
+  const result = await db.query(
+    "SELECT id, display_name, invite_accepted FROM users WHERE invite_token = $1",
+    [token]
+  );
 
-  if (!user) {
+  if (result.rows.length === 0) {
     return c.json({ error: "Invite not found" }, 404);
   }
 
+  const user = result.rows[0];
   return c.json({
     display_name: user.display_name,
     invite_accepted: !!user.invite_accepted,
   });
 });
 
-// Accept invite (public — user sets username and password)
 invites.post("/:token/accept", async (c) => {
+  const db = c.get("db");
   const token = c.req.param("token");
   const { username, password } = await c.req.json<{
     username: string;
@@ -66,56 +60,47 @@ invites.post("/:token/accept", async (c) => {
     return c.json({ error: "username and password required" }, 400);
   }
 
-  const user = await c.env.DB.prepare(
-    "SELECT * FROM users WHERE invite_token = ?"
-  )
-    .bind(token)
-    .first<User>();
+  const userResult = await db.query(
+    "SELECT * FROM users WHERE invite_token = $1",
+    [token]
+  );
 
-  if (!user) {
+  if (userResult.rows.length === 0) {
     return c.json({ error: "Invite not found" }, 404);
   }
+
+  const user = userResult.rows[0] as User;
 
   if (user.invite_accepted) {
     return c.json({ error: "Invite already accepted" }, 400);
   }
 
-  // Check username uniqueness
-  const existing = await c.env.DB.prepare(
-    "SELECT id FROM users WHERE username = ?"
-  )
-    .bind(username)
-    .first();
+  const existing = await db.query(
+    "SELECT id FROM users WHERE username = $1",
+    [username]
+  );
 
-  if (existing) {
+  if (existing.rows.length > 0) {
     return c.json({ error: "Username already taken" }, 409);
   }
 
   const password_hash = await hashPassword(password);
 
-  await c.env.DB.prepare(
-    "UPDATE users SET username = ?, password_hash = ?, invite_accepted = 1 WHERE id = ?"
-  )
-    .bind(username, password_hash, user.id)
-    .run();
+  await db.query(
+    "UPDATE users SET username = $1, password_hash = $2, invite_accepted = true WHERE id = $3",
+    [username, password_hash, user.id]
+  );
 
-  // Auto-login
   const sessionId = generateUUID();
-  const expiresAt = new Date(
-    Date.now() + 30 * 24 * 60 * 60 * 1000
-  ).toISOString();
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  await c.env.DB.prepare(
-    "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)"
-  )
-    .bind(sessionId, user.id, expiresAt)
-    .run();
+  await db.query(
+    "INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)",
+    [sessionId, user.id, expiresAt]
+  );
 
-  const updated = await c.env.DB.prepare("SELECT * FROM users WHERE id = ?")
-    .bind(user.id)
-    .first<User>();
-
-  const { password_hash: _, ...safeUser } = updated!;
+  const updated = await db.query("SELECT * FROM users WHERE id = $1", [user.id]);
+  const { password_hash: _, ...safeUser } = updated.rows[0];
 
   return c.json({ user: safeUser }, 200, {
     "Set-Cookie": `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,

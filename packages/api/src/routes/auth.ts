@@ -4,24 +4,23 @@ import { hashPassword, verifyPassword, generateUUID } from "../lib/crypto";
 import { requireAuth } from "../middleware/auth";
 
 const auth = new Hono<{
-  Bindings: Env;
-  Variables: { user: User; sessionId: string };
+  Variables: Env & { user: User; sessionId: string };
 }>();
 
-// Check if setup is needed
 auth.get("/status", async (c) => {
-  const admin = await c.env.DB.prepare(
+  const db = c.get("db");
+  const result = await db.query(
     "SELECT id FROM users WHERE role = 'admin' LIMIT 1"
-  ).first();
-  return c.json({ needs_setup: !admin });
+  );
+  return c.json({ needs_setup: result.rows.length === 0 });
 });
 
-// First-run admin setup
 auth.post("/setup", async (c) => {
-  const existing = await c.env.DB.prepare(
+  const db = c.get("db");
+  const existing = await db.query(
     "SELECT id FROM users WHERE role = 'admin' LIMIT 1"
-  ).first();
-  if (existing) {
+  );
+  if (existing.rows.length > 0) {
     return c.json({ error: "Admin already exists" }, 400);
   }
 
@@ -38,42 +37,39 @@ auth.post("/setup", async (c) => {
   const id = generateUUID();
   const password_hash = await hashPassword(password);
 
-  await c.env.DB.prepare(
-    "INSERT INTO users (id, username, display_name, password_hash, role, invite_accepted) VALUES (?, ?, ?, ?, 'admin', 1)"
-  )
-    .bind(id, username, display_name, password_hash)
-    .run();
+  await db.query(
+    "INSERT INTO users (id, username, display_name, password_hash, role, invite_accepted) VALUES ($1, $2, $3, $4, 'admin', true)",
+    [id, username, display_name, password_hash]
+  );
 
   const sessionId = generateUUID();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  await c.env.DB.prepare(
-    "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)"
-  )
-    .bind(sessionId, id, expiresAt)
-    .run();
+  await db.query(
+    "INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)",
+    [sessionId, id, expiresAt]
+  );
 
-  const user = await c.env.DB.prepare("SELECT * FROM users WHERE id = ?")
-    .bind(id)
-    .first<User>();
+  const userResult = await db.query("SELECT * FROM users WHERE id = $1", [id]);
 
-  return c.json({ user: sanitizeUser(user!) }, 201, {
+  return c.json({ user: sanitizeUser(userResult.rows[0]) }, 201, {
     "Set-Cookie": `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
   });
 });
 
-// Login
 auth.post("/login", async (c) => {
+  const db = c.get("db");
   const { username, password } = await c.req.json<{
     username: string;
     password: string;
   }>();
 
-  const user = await c.env.DB.prepare(
-    "SELECT * FROM users WHERE username = ? AND invite_accepted = 1"
-  )
-    .bind(username)
-    .first<User>();
+  const result = await db.query(
+    "SELECT * FROM users WHERE username = $1 AND invite_accepted = true",
+    [username]
+  );
+
+  const user = result.rows[0] as User | undefined;
 
   if (!user || !user.password_hash) {
     return c.json({ error: "Invalid credentials" }, 401);
@@ -87,29 +83,25 @@ auth.post("/login", async (c) => {
   const sessionId = generateUUID();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  await c.env.DB.prepare(
-    "INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)"
-  )
-    .bind(sessionId, user.id, expiresAt)
-    .run();
+  await db.query(
+    "INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)",
+    [sessionId, user.id, expiresAt]
+  );
 
   return c.json({ user: sanitizeUser(user) }, 200, {
     "Set-Cookie": `session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`,
   });
 });
 
-// Get current user
 auth.get("/me", requireAuth, (c) => {
   const user = c.get("user");
   return c.json({ user: sanitizeUser(user) });
 });
 
-// Logout
 auth.post("/logout", requireAuth, async (c) => {
+  const db = c.get("db");
   const sessionId = c.get("sessionId");
-  await c.env.DB.prepare("DELETE FROM sessions WHERE id = ?")
-    .bind(sessionId)
-    .run();
+  await db.query("DELETE FROM sessions WHERE id = $1", [sessionId]);
   return c.json({ ok: true }, 200, {
     "Set-Cookie": "session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
   });

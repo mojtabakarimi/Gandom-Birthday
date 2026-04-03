@@ -1,13 +1,16 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
+    "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src",
     "jsx": "react-jsx",
-    "types": ["@cloudflare/workers-types"]
+    "types": ["node"]
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["test/**/*"]
 }

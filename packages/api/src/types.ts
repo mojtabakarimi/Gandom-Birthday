@@ -1,7 +1,9 @@
+import type { Pool } from "pg";
+
 export type Env = {
-  DB: D1Database;
-  BUCKET: R2Bucket;
-  CORS_ORIGIN: string;
+  db: Pool;
+  uploadDir: string;
+  corsOrigin: string;
 };
 
 export type User = {
@@ -12,7 +14,7 @@ export type User = {
   password_hash: string | null;
   role: "admin" | "user";
   invite_token: string | null;
-  invite_accepted: number;
+  invite_accepted: boolean;
   created_at: string;
 };
 
