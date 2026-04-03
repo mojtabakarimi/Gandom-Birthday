@@ -7,6 +7,8 @@ import { Login } from "./pages/Login";
 import { Setup } from "./pages/Setup";
 import { Invite } from "./pages/Invite";
 import { Home } from "./pages/Home";
+import { Gallery } from "./pages/Gallery";
+import { Upload } from "./pages/Upload";
 
 function Placeholder({ name }: { name: string }) {
   return <div className="p-8 text-center text-gray-500">{name} — coming soon</div>;
@@ -26,7 +28,7 @@ export function App() {
               path="/gallery"
               element={
                 <ProtectedRoute>
-                  <Placeholder name="Gallery" />
+                  <Gallery />
                 </ProtectedRoute>
               }
             />
@@ -34,7 +36,7 @@ export function App() {
               path="/upload"
               element={
                 <ProtectedRoute>
-                  <Placeholder name="Upload" />
+                  <Upload />
                 </ProtectedRoute>
               }
             />
