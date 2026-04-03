@@ -44,9 +44,9 @@ export function MobileMenu({ items }: Props) {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-12 z-50 bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[200px]">
+          <div className="absolute top-12 z-50 bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[200px]" style={{ insetInlineEnd: 0 }}>
             {/* Language section */}
-            <div className="px-4 py-2 border-b border-gray-100">
+            <div className="px-4 py-2 border-b border-gray-100" dir="ltr">
               <p className="text-xs text-gray-400 mb-2 uppercase tracking-wide">Language</p>
               <div className="flex gap-1">
                 {langs.map((l) => (
@@ -76,7 +76,7 @@ export function MobileMenu({ items }: Props) {
                   item.onClick();
                   setOpen(false);
                 }}
-                className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                className={`w-full text-start px-4 py-2.5 text-sm transition-colors ${
                   item.variant === "danger"
                     ? "text-red-600 hover:bg-red-50"
                     : "text-gray-700 hover:bg-gray-50"
