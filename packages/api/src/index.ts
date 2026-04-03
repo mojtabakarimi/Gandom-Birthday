@@ -5,6 +5,7 @@ import { auth } from "./routes/auth";
 import { invites } from "./routes/invites";
 import { uploads } from "./routes/uploads";
 import { gallery } from "./routes/gallery";
+import { admin } from "./routes/admin";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -21,5 +22,6 @@ app.route("/api/auth", auth);
 app.route("/api/invites", invites);
 app.route("/api/uploads", uploads);
 app.route("/api/gallery", gallery);
+app.route("/api/admin", admin);
 
 export default app;
