@@ -10,16 +10,23 @@ import { CardAnimation } from "../components/CardAnimation";
 import { ConfettiEffect } from "../components/ConfettiEffect";
 import { CountdownTimer } from "../components/CountdownTimer";
 
-type Step = "language" | "envelope" | "card" | "final";
+const BIRTHDAY = "2026-04-19T00:00:00";
+
+function isBirthdayOrAfter() {
+  return new Date() >= new Date(BIRTHDAY);
+}
+
+type Step = "language" | "countdown" | "envelope" | "card" | "final";
 
 export function Home() {
   const { lang, setLang, t } = useI18n();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [step, setStep] = useState<Step>(() =>
-    localStorage.getItem("lang") ? "envelope" : "language"
-  );
+  const [step, setStep] = useState<Step>(() => {
+    if (!localStorage.getItem("lang")) return "language";
+    return isBirthdayOrAfter() ? "envelope" : "countdown";
+  });
   const [showConfetti, setShowConfetti] = useState(false);
   const [settings, setSettings] = useState<Record<string, string>>({});
 
@@ -29,17 +36,6 @@ export function Home() {
 
   const message =
     settings[`birthday_message_${lang}`] || settings.birthday_message_en || "";
-
-  const isCountdown = settings.mode === "countdown";
-
-  if (isCountdown) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-400 to-indigo-500 flex flex-col items-center justify-center p-4">
-        <LanguagePicker className="absolute top-4 right-4" />
-        <CountdownTimer targetDate={settings.birthday_date || ""} />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-400 to-indigo-500 relative overflow-hidden">
@@ -57,15 +53,15 @@ export function Home() {
             <h2 className="text-2xl text-white font-bold">Choose your language</h2>
             <div className="flex gap-4">
               {[
-                { code: "fa" as const, label: "\u0641\u0627\u0631\u0633\u06CC", flag: "\uD83C\uDDEE\uD83C\uDDF7" },
-                { code: "nb" as const, label: "Norsk", flag: "\uD83C\uDDF3\uD83C\uDDF4" },
-                { code: "en" as const, label: "English", flag: "\uD83C\uDDEC\uD83C\uDDE7" },
+                { code: "fa" as const, label: "فارسی", flag: "🇮🇷" },
+                { code: "nb" as const, label: "Norsk", flag: "🇳🇴" },
+                { code: "en" as const, label: "English", flag: "🇬🇧" },
               ].map((l) => (
                 <button
                   key={l.code}
                   onClick={() => {
                     setLang(l.code);
-                    setStep("envelope");
+                    setStep(isBirthdayOrAfter() ? "envelope" : "countdown");
                   }}
                   className="px-6 py-4 bg-white/20 backdrop-blur-sm rounded-xl text-white hover:bg-white/30 transition-colors text-lg"
                 >
@@ -74,6 +70,41 @@ export function Home() {
                 </button>
               ))}
             </div>
+          </motion.div>
+        )}
+
+        {step === "countdown" && (
+          <motion.div
+            key="countdown"
+            className="flex flex-col items-center justify-center min-h-screen gap-8 px-4"
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center"
+            >
+              <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-2">
+                🎂 Gandom 🎂
+              </h1>
+              <p className="text-xl text-white/80">{t("age_text")}</p>
+            </motion.div>
+
+            <CountdownTimer targetDate={BIRTHDAY} />
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+              className="flex gap-4 mt-4"
+            >
+              <button
+                onClick={() => navigate(user ? "/upload" : "/login")}
+                className="px-6 py-3 bg-white/20 backdrop-blur-sm text-white rounded-full font-bold hover:bg-white/30 transition-colors"
+              >
+                {t("send_wish")}
+              </button>
+            </motion.div>
           </motion.div>
         )}
 

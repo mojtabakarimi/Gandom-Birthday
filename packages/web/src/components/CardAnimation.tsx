@@ -32,7 +32,7 @@ export function CardAnimation({ message, onComplete }: Props) {
           animate={{ scale: 1, rotate: 0 }}
           transition={{ delay: 0.8, type: "spring", stiffness: 150 }}
         >
-          7
+          6
         </motion.div>
 
         <motion.p
