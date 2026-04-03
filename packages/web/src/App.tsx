@@ -6,6 +6,7 @@ import { AdminRoute } from "./auth/AdminRoute";
 import { Login } from "./pages/Login";
 import { Setup } from "./pages/Setup";
 import { Invite } from "./pages/Invite";
+import { Home } from "./pages/Home";
 
 function Placeholder({ name }: { name: string }) {
   return <div className="p-8 text-center text-gray-500">{name} — coming soon</div>;
@@ -17,7 +18,7 @@ export function App() {
       <I18nProvider>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Placeholder name="Home" />} />
+            <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/setup" element={<Setup />} />
             <Route path="/invite/:token" element={<Invite />} />
