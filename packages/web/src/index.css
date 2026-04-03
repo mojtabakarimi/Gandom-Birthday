@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+/* Apply Vazirmatn for Persian (RTL) and as fallback for all text */
+html {
+  font-family: "Vazirmatn", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* Ensure RTL elements always use Vazirmatn */
+[dir="rtl"],
+:lang(fa) {
+  font-family: "Vazirmatn", sans-serif;
+}
