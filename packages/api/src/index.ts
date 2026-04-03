@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "./types";
 import { auth } from "./routes/auth";
+import { invites } from "./routes/invites";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -15,5 +16,6 @@ app.use(
 
 app.get("/api/health", (c) => c.json({ ok: true }));
 app.route("/api/auth", auth);
+app.route("/api/invites", invites);
 
 export default app;
