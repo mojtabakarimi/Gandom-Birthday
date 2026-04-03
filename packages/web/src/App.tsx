@@ -9,10 +9,12 @@ import { Invite } from "./pages/Invite";
 import { Home } from "./pages/Home";
 import { Gallery } from "./pages/Gallery";
 import { Upload } from "./pages/Upload";
-
-function Placeholder({ name }: { name: string }) {
-  return <div className="p-8 text-center text-gray-500">{name} — coming soon</div>;
-}
+import { AdminLayout } from "./pages/admin/AdminLayout";
+import { Dashboard } from "./pages/admin/Dashboard";
+import { Users } from "./pages/admin/Users";
+import { Pending } from "./pages/admin/Pending";
+import { Content } from "./pages/admin/Content";
+import { Settings } from "./pages/admin/Settings";
 
 export function App() {
   return (
@@ -41,13 +43,19 @@ export function App() {
               }
             />
             <Route
-              path="/admin/*"
+              path="/admin"
               element={
                 <AdminRoute>
-                  <Placeholder name="Admin" />
+                  <AdminLayout />
                 </AdminRoute>
               }
-            />
+            >
+              <Route index element={<Dashboard />} />
+              <Route path="users" element={<Users />} />
+              <Route path="pending" element={<Pending />} />
+              <Route path="content" element={<Content />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
           </Routes>
         </AuthProvider>
       </I18nProvider>
