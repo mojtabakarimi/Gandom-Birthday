@@ -29,7 +29,7 @@ export function Gallery() {
             {t("gallery_title")}
           </h1>
           <div className="flex items-center gap-3">
-            <LanguagePicker />
+            <LanguagePicker variant="light" />
             <button
               onClick={() => navigate("/upload")}
               className="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
